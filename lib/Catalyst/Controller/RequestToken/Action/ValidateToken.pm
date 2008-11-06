@@ -5,32 +5,18 @@ use warnings;
 
 use base qw(Catalyst::Action);
 
-use Catalyst::Exception;
-
 sub execute {
     my $self = shift;
     my ( $controller, $c, @args ) = @_;
 
-    my $conf = $controller->config;
-
-    $c->log->debug('validate token') if $c->debug;
-    my $session = $c->session->{ $conf->{session_name} };
-    my $request = $c->req->param( $conf->{request_name} );
-
-    if ( ( $session && $request ) && $session eq $request ) {
-        $c->stash->{validate_token} = 1;
-        $c->log->debug('token is valid') if $c->debug;
-    } else {
-        $c->log->debug('token is invalid') if $c->debug;
-        if ( $c->isa('Catalyst::Plugin::FormValidator::Simple') ) {
-            $c->set_invalid_form(
-                $conf->{request_name} => 'TOKEN' );
-        }
-    }
-
-    undef $c->session->{ $conf->{session_name} };
-    return $self->NEXT::execute(@_);
+    $controller->validate_token;
+    $controller->remove_token;
+    return $self->next::method(@_);
 }
+
+1;
+
+__END__
 
 =head1 NAME
 
@@ -56,7 +42,7 @@ L<Catalyst::Action>
 
 =head1 AUTHOR
 
-Hideo Kimura C<< <<hide@hide-k.net>> >>
+Hideo Kimura C<< <<hide<at>hide-k.net>> >>
 
 =head1 COPYRIGHT
 
@@ -67,5 +53,4 @@ The full text of the license can be found in the
 LICENSE file included with this module.
 
 =cut
-1;
 

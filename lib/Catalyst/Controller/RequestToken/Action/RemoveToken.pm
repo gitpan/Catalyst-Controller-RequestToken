@@ -1,4 +1,4 @@
-package Catalyst::Controller::RequestToken::Action::CreateToken;
+package Catalyst::Controller::RequestToken::Action::RemoveToken;
 
 use strict;
 use warnings;
@@ -9,8 +9,8 @@ sub execute {
     my $self = shift;
     my ( $controller, $c, @args ) = @_;
 
-    $controller->create_token;
-    return $self->NEXT::execute(@_);
+    $controller->remove_token;
+    return $self->next::method(@_);
 }
 
 1;
@@ -19,7 +19,7 @@ __END__
 
 =head1 NAME
 
-Catalyst::Controller::RequestToken::Action::CreateToken
+Catalyst::Controller::RequestToken::Action::RemoveToken
 
 =head1 SYNOPSIS
 
