@@ -9,15 +9,15 @@ use Scalar::Util qw/weaken/;
 use Class::C3;
 use Digest;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 sub ACCEPT_CONTEXT {
-    my ($self, $c) = @_;
+    my ( $self, $c ) = @_;
 
     $self->{c} = $c;
     weaken( $self->{c} );
 
-    return $self->NEXT::ACCEPT_CONTEXT( $c, @_ ) || $self;
+    return $self->maybe::next::method( $c, @_ ) || $self;
 }
 
 sub new {
@@ -29,15 +29,9 @@ sub new {
     Catalyst::Exception->throw("Catalyst::Plugin::Session is required")
         unless $c->isa('Catalyst::Plugin::Session');
 
-    my $config = {
-        session_name => '_token',
-        request_name => '_token',
-        %{ $c->config->{'Controller::RequestToken'} },
-        %{ $class->config },
-        %{$args},
-    };
+    $self->{session_name} ||= '_token';
+    $self->{request_name} ||= '_token';
 
-    $self->config($config);
     return $self;
 }
 
@@ -75,42 +69,41 @@ sub remove_token {
     my $c = $self->{c};
 
     $c->log->debug("remove token") if $c->debug;
-    undef $c->session->{$self->_ident()};
+    undef $c->session->{ $self->_ident() };
     $self->token(undef);
 }
 
 sub validate_token {
     my ( $self, $arg ) = @_;
 
-    my $c    = $self->{c};
-    my $conf = $self->config;
+    my $c = $self->{c};
 
     $c->log->debug('validate token') if $c->debug;
     my $session = $self->token;
-    my $request = $c->req->param( $conf->{request_name} );
+    my $request = $c->req->param( $self->{request_name} );
 
-    $c->log->debug("session: $session");
-    $c->log->debug("request: $request");
+    $c->log->debug( "session:" . ( $session ? $session : '' ) );
+    $c->log->debug( "request:" . ( $request ? $request : '' ) );
 
     if ( ( $session && $request ) && $session eq $request ) {
         $c->log->debug('token is valid') if $c->debug;
-         $c->stash->{$self->_ident()} = 1;
+        $c->stash->{ $self->_ident() } = 1;
     }
     else {
         $c->log->debug('token is invalid') if $c->debug;
         if ( $c->isa('Catalyst::Plugin::FormValidator::Simple') ) {
-            $c->set_invalid_form( $conf->{request_name} => 'TOKEN' );
+            $c->set_invalid_form( $self->{request_name} => 'TOKEN' );
         }
-        undef $c->stash->{$self->_ident()};
+        undef $c->stash->{ $self->_ident() };
     }
 }
 
 sub is_valid_token {
     my ( $self, $arg ) = @_;
 
-    my $c    = $self->{c};
+    my $c = $self->{c};
 
-    return $c->stash->{$self->_ident()};
+    return $c->stash->{ $self->_ident() };
 }
 
 sub _ident {    # secret stash key for this template'
@@ -287,7 +280,7 @@ ValidateToken.
 
 in your application class:
 
-    __PACKAGE__->config('Controller::RequestToken' => {
+    __PACKAGE__->config('Controller::TokenBasedMyController' => {
         session_name => '_token',
         request_name => '_token',
     });
