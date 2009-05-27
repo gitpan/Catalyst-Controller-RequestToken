@@ -9,7 +9,7 @@ use Scalar::Util qw/weaken/;
 use MRO::Compat;
 use Digest;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 sub ACCEPT_CONTEXT {
     my ( $self, $c ) = @_;
@@ -82,8 +82,8 @@ sub validate_token {
     my $session = $self->token;
     my $request = $c->req->param( $self->{request_name} );
 
-    $c->log->debug( "session:" . ( $session ? $session : '' ) );
-    $c->log->debug( "request:" . ( $request ? $request : '' ) );
+    $c->log->debug( "session:" . ( $session ? $session : '' ) ) if $c->debug;
+    $c->log->debug( "request:" . ( $request ? $request : '' ) ) if $c->debug;
 
     if ( ( $session && $request ) && $session eq $request ) {
         $c->log->debug('token is valid') if $c->debug;
