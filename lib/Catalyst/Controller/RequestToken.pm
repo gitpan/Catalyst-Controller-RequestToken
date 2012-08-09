@@ -1,57 +1,39 @@
 package Catalyst::Controller::RequestToken;
+use Moose;
+BEGIN { extends 'Catalyst::Controller' }
 
-use strict;
-use warnings;
-
-use base qw(Catalyst::Controller);
-
-use Scalar::Util qw/weaken/;
-use MRO::Compat;
 use Digest;
+use Catalyst::Exception;
+use namespace::autoclean;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
-sub ACCEPT_CONTEXT {
-    my ( $self, $c ) = @_;
+has [qw/ session_name request_name /] => (
+    is => 'ro',
+    default => '_token'
+);
 
-    $self->{c} = $c;
-    weaken( $self->{c} );
-
-    return $self->maybe::next::method( $c, @_ ) || $self;
-}
-
-sub new {
-    my $class = shift;
-    my ( $c, $args ) = @_;
-
-    my $self = $class->next::method( $c, $args );
+sub BUILD {
+    my $self = shift;
 
     Catalyst::Exception->throw("Catalyst::Plugin::Session is required")
-        unless $c->isa('Catalyst::Plugin::Session');
-
-    $self->{session_name} ||= '_token';
-    $self->{request_name} ||= '_token';
-
-    return $self;
+        unless $self->_application->isa('Catalyst::Plugin::Session');
 }
 
 sub token {
-    my ( $self, $arg ) = @_;
+    my ( $self, $ctx, $arg ) = @_;
 
-    my $c = $self->{c};
-
+    confess("ARGH") unless $ctx && blessed($ctx);
     if ( defined $arg ) {
-        $c->session->{ $self->_ident() } = $arg;
+        $ctx->session->{ $self->_ident() } = $arg;
         return $arg;
     }
 
-    return $c->session->{ $self->_ident() };
+    return $ctx->session->{ $self->_ident() };
 }
 
 sub create_token {
-    my ( $self, $arg ) = @_;
-
-    my $c = $self->{c};
+    my ( $self, $c, $arg ) = @_;
 
     $c->log->debug("create token") if $c->debug;
     my $digest = _find_digest();
@@ -60,26 +42,22 @@ sub create_token {
     my $token = $digest->hexdigest;
     $c->log->debug("token is created: $token") if $c->debug;
 
-    return $self->token($token);
+    return $self->token($c, $token);
 }
 
 sub remove_token {
-    my ( $self, $arg ) = @_;
-
-    my $c = $self->{c};
+    my ( $self, $c, $arg ) = @_;
 
     $c->log->debug("remove token") if $c->debug;
     undef $c->session->{ $self->_ident() };
-    $self->token(undef);
+    $self->token($c, undef);
 }
 
 sub validate_token {
-    my ( $self, $arg ) = @_;
-
-    my $c = $self->{c};
+    my ( $self, $c, $arg ) = @_;
 
     $c->log->debug('validate token') if $c->debug;
-    my $session = $self->token;
+    my $session = $self->token($c);
     my $request = $c->req->param( $self->{request_name} );
 
     $c->log->debug( "session:" . ( $session ? $session : '' ) ) if $c->debug;
@@ -99,11 +77,10 @@ sub validate_token {
 }
 
 sub is_valid_token {
-    my ( $self, $arg ) = @_;
+    my ( $self, $ctx, $arg ) = @_;
 
-    my $c = $self->{c};
-
-    return $c->stash->{ $self->_ident() };
+    confess("ARGH") unless blessed($ctx);
+    return $ctx->stash->{ $self->_ident() };
 }
 
 sub _ident {    # secret stash key for this template'
@@ -165,7 +142,7 @@ __END__
 
 =head1 NAME
 
-Catalyst::Controller::RequestToken - Handling transaction token across forms
+Catalyst::Controller::RequestToken - Handling transaction tokens across forms
 
 =head1 SYNOPSIS
 
@@ -181,26 +158,26 @@ requires Catalyst::Plugin::Session module, in your application class:
 in your controller class:
 
     use base qw(Catalyst::Controller::RequestToken);
-    
+
     sub form :Local {
         my ($self, $c) = @_;
-        $c->stash->{template} = 'form.tt';
-        $c->forward($c->view('TT'));
+        $c->stash( template => 'form.tt' );
     }
-    
+
     sub confirm :Local :CreateToken {
         my ($self, $c) = @_;
-        $c->stash->{template} = 'confirm.tt';
-        $c->forward($c->view('TT'));
+        $c->stash( template => 'confirm.tt' );
     }
-    
+
     sub complete :Local :ValidateToken {
         my ($self, $c) = @_;
-        if ($self->validate_token) {
+
+        if ($self->valid_token($c)) {
             $c->response->body('complete.');
-        } eles {
+        }
+        eles {
             $c->response->body('invalid operation.');
-        }    
+        }
     }
 
 form.tt
@@ -226,8 +203,8 @@ confirm.tt
 
 =head1 DESCRIPTION
 
-This controller enables to enforcing a single transaction across multi forms.
-Using token, you can prevent duplicate submits, or protect from CSRF atack.
+This controller enables to enforce a single transaction across multiple forms.
+Using a token, you can prevent duplicate submits and protect your app from CSRF atacks.
 
 This module REQUIRES Catalyst::Plugin::Session to store server side token.
 
@@ -237,27 +214,30 @@ This module REQUIRES Catalyst::Plugin::Session to store server side token.
 
 =item CreateToken
 
-Creates new token and put it into request and session. 
-You can return a content with request token which should be posted 
+Creates a new token and puts it into request and session. 
+You can return content with request token which should be posted 
 to server.
 
 =item ValidateToken
 
-After CreateToken, clients will post token request, so you need
-validate it correct or not.
+After CreateToken, clients will post token request, so you need to
+validate whether it is correct or not.
 
-ValidateToken attribute validates request token with session token 
-which is created by CreateToken attribute.
+The ValidateToken attribute wil make your action validate the request token 
+by comparing it to the session token which is created by the CreateToken attribute.
 
-If token is valid, server-side token will be expired.
+If the token is valid, the server-side token will be expired. Use is_valid_token()
+to check wheter the token in this request was valid or not.
 
 =item RemoveToken
 
-Removes token from session, then request token will be invalid any more.
+Removes the token from the session. The request token will no longer be valid.
 
 =back
 
 =head1 METHODS
+
+All methods must be passed the request context as their first parameter.
 
 =over 4
 
@@ -269,7 +249,7 @@ Removes token from session, then request token will be invalid any more.
 
 =item validate_token
 
-Return token is valid or not.  This will work collectlly only after
+Return whether token is valid or not.  This will work correctly only after 
 ValidateToken.
 
 =item is_valid_token
@@ -301,24 +281,24 @@ Default: _token
 
 =back
 
-=head1 INTERNAL METHODS
-
-=over 4
-
-=item new
-
-=item ACCEPT_CONTEXT
-
-=back
 
 =head1 SEE ALSO
 
-L<Catalyst::Controller::RequestToken::Action::CreateToken>
-L<Catalyst::Controller::RequestToken::Action::ValidateToken>
-L<Catalyst>
-L<Catalyst::Controller>
-L<Catalyst::Plugin::Session>
-L<Catalyst::Plugin::FormValidator::Simple>
+=over
+
+=item L<Catalyst::Controller::RequestToken::Action::CreateToken>
+
+=item L<Catalyst::Controller::RequestToken::Action::ValidateToken>
+
+=item L<Catalyst>
+
+=item L<Catalyst::Controller>
+
+=item L<Catalyst::Plugin::Session>
+
+=item L<Catalyst::Plugin::FormValidator::Simple>
+
+=back
 
 =head1 AUTHOR
 

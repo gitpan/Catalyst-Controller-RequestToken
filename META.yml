@@ -1,19 +1,20 @@
 ---
-abstract: 'Handling transaction token across forms'
+abstract: 'Handling transaction tokens across forms'
 author:
   - 'Hideo Kimura C<< <<hide<at>hide-k.net>> >>'
 build_requires:
   Catalyst::Action::RenderView: 0
   Catalyst::Plugin::Session: 0
   Catalyst::Plugin::Session::State::Cookie: 0
-  Catalyst::Runtime: 5.7
-  ExtUtils::MakeMaker: 6.42
+  Catalyst::Runtime: 5.8
+  ExtUtils::MakeMaker: 6.36
   Test::More: 0
   ok: 0
 configure_requires:
-  ExtUtils::MakeMaker: 6.42
+  ExtUtils::MakeMaker: 6.36
 distribution_type: module
-generated_by: 'Module::Install version 0.88'
+dynamic_config: 1
+generated_by: 'Module::Install version 1.06'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -25,8 +26,8 @@ no_index:
     - t
 requires:
   Digest: 0
-  MRO::Compat: 0
   Scalar::Util: 0
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.06
+  repository: git://github.com/hidek/Catalyst-Controller-RequestToken.git
+version: 0.07
